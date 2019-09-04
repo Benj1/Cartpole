@@ -10,6 +10,7 @@ class RandomAgent(object):
     return self.action_space.sample()
 
 class BetterAgent(object):
+  """ Learns using tile coding and linear function approximation. """
   def __init__(self, action_space):
     self.action_space = action_space
     self.no_of_tiles = 20
@@ -19,6 +20,7 @@ class BetterAgent(object):
     self.training_rate = 0.1
 
   def act(self, state, reward):
+    """ Epsilon-greedy policy. """
     x0 = tiles.tiles(self.iht, self.no_of_tiles, np.append(state, 0)*self.normalise)
     x1 = tiles.tiles(self.iht, self.no_of_tiles, np.append(state, 1)*self.normalise)
     a0 = sum([self.weights[x0[i]][i] for i in range(self.no_of_tiles)])
@@ -36,6 +38,7 @@ class BetterAgent(object):
     return action
 
   def update_weights(self, reward, state, new_state, action, new_action):
+    """ Update the agents weights after a non-terminal step. """
     x = tiles.tiles(self.iht, self.no_of_tiles, np.append(state, action)*self.normalise)
     new_x = tiles.tiles(self.iht, self.no_of_tiles, np.append(new_state, new_action)*self.normalise)
     q = sum([self.weights[x[i]][i] for i in range(self.no_of_tiles)])
@@ -44,6 +47,7 @@ class BetterAgent(object):
       self.weights[x[i]][i] += self.training_rate*(reward + new_q - q)
   
   def terminal_update(self, reward, state, action):
+    """ Update the weights after a terminal step. """
     x = tiles.tiles(self.iht, self.no_of_tiles, np.append(state, action)*self.normalise)
     q = sum([self.weights[x[i]][i] for i in range(self.no_of_tiles)])
     for i in range(self.no_of_tiles):
@@ -57,7 +61,6 @@ agent = BetterAgent(env.action_space)
 for i in range(2000):
   state = env.reset()
   reward = 1
-  done = False
   action = agent.act(state, reward)
   while True:
     if i > 1900:
