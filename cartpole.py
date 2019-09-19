@@ -3,12 +3,22 @@ import numpy as np
 import tiles
 import torch
 
-class RandomAgent(object):
-  """ The World's Worst Agent. """
-  def __init__(self, action_space):
-    self.action_space = action_space
+class Agent(object):
+  """ A superclass for all agents """
+  def __init__(self, environment):
+    self.environment = environment
   def act(self, observation, reward):
-    return self.action_space.sample()
+    raise NotImplementedError
+  def update_weights(self, reward, state, new_state, action, new_action):
+    pass
+  def terminal_update(self, reward, state, action):
+    pass
+
+class RandomAgent(Agent):
+  """ The World's Worst Agent. """
+  def act(self, observation, reward):
+    action_space = self.environment.action_space
+    return action_space.sample()
 
 class BetterAgent(object):
   """ Learns using tile coding and linear function approximation. """
@@ -56,25 +66,32 @@ class BetterAgent(object):
 
 class IntelligentAgent(object):
   """ Learns using an artifical neural network. """
-  def __init__(self, action_space):
-    self.action_space = action_space
-    self.D_in, self.H, self.D_out = 5, 5, 1
+  def __init__(self, environment):
+    self.environment = environment
+    self.D_in, self.H1, self.H2, self.D_out = 5, 20, 50, 1
     self.model = torch.nn.Sequential(
-        torch.nn.Linear(self.D_in, self.H),
+        torch.nn.Linear(self.D_in, self.H1),
         torch.nn.ReLU(),
-        torch.nn.Linear(self.H, self.D_out),
+        torch.nn.Linear(self.H1, self.H2),
+        torch.nn.ReLU(),
+        torch.nn.Linear(self.H2, self.D_out),
     )
+    self.learning_rate = 0.1
 
-  def act(self, state, reward):
+  def act(self, state, reward, episode):
     """ Greedy action based on feed forward of neural network. """
     state0 = torch.from_numpy(np.append(state, 0)).float()
     state1 = torch.from_numpy(np.append(state, 1)).float()
     q0 = self.model(state0).item()
     q1 = self.model(state1).item()
-    if q0 > q1:
-      return 0
+    if np.random.rand() > 1 - 1/(0.01*episode + 1):
+      action = np.random.choice([0,1])
     else:
-      return 1
+      if q0 > q1:
+        action = 0
+      else:
+        action = 1
+    return action
   
   def update_weights(self, reward, state, new_state, action, new_action):
     old_in = torch.from_numpy(np.append(state, action)).float()
@@ -82,41 +99,42 @@ class IntelligentAgent(object):
 
     q = self.model(old_in)
     update_target = torch.tensor([reward]) + self.model(new_in)
-    loss = update_target - q
+    loss = (update_target - q)**2
 
     self.model.zero_grad()
     loss.backward()
     with torch.no_grad():
       for param in self.model.parameters():
-        param -= 0.1 * param.grad
+        param -= self.learning_rate * param.grad
 
   def terminal_update(self, reward, state, action):
     input_tensor = torch.from_numpy(np.append(state, action)).float()
     q = self.model(input_tensor)
     update_target = torch.tensor([reward])
-    loss = update_target - q
+    loss = (update_target - q)**2
     self.model.zero_grad()    
     loss.backward()
     with torch.no_grad():
       for param in self.model.parameters():
-        param -= 0.1 * param.grad
+        param -= self.learning_rate * param.grad
 
 # Initialise the environment and the agent
 env = gym.make('CartPole-v0')
-agent = IntelligentAgent(env.action_space)
+agent = IntelligentAgent(env)
 
 # Run episodes
-for i in range(1000):
+for episode in range(2000):
   state = env.reset()
   reward = 1
-  action = agent.act(state, reward)
+  action = agent.act(state, reward, episode)
   while True:
-    env.render()  
+    if episode%10 == 0:
+      env.render()  
     new_state, reward, done, _ = env.step(action)
     if done:
       agent.terminal_update(reward, state, action)
       break
-    new_action = agent.act(new_state, reward)
+    new_action = agent.act(new_state, reward, episode)
     agent.update_weights(reward, state, new_state, action, new_action)
     action = new_action
     state = new_state
