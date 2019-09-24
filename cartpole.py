@@ -68,13 +68,13 @@ class IntelligentAgent(object):
   """ Learns using an artifical neural network. """
   def __init__(self, environment):
     self.environment = environment
-    self.D_in, self.H1, self.H2, self.D_out = 5, 20, 50, 1
+    self.D_in, self.H1, self.H2, self.D_out = 5, 50, 50, 1
     self.model = torch.nn.Sequential(
         torch.nn.Linear(self.D_in, self.H1),
         torch.nn.ReLU(),
         torch.nn.Linear(self.H1, self.H2),
         torch.nn.ReLU(),
-        torch.nn.Linear(self.H2, self.D_out),
+        torch.nn.Linear(self.H2, self.D_out)
     )
     self.learning_rate = 0.1
 
@@ -84,7 +84,7 @@ class IntelligentAgent(object):
     state1 = torch.from_numpy(np.append(state, 1)).float()
     q0 = self.model(state0).item()
     q1 = self.model(state1).item()
-    if np.random.rand() > 1 - 1/(0.01*episode + 1):
+    if np.random.rand() > 1 - 1/(0.1*episode + 0.1):
       action = np.random.choice([0,1])
     else:
       if q0 > q1:
@@ -128,7 +128,7 @@ for episode in range(2000):
   reward = 1
   action = agent.act(state, reward, episode)
   while True:
-    if episode%10 == 0:
+    if episode > 600:
       env.render()  
     new_state, reward, done, _ = env.step(action)
     if done:
